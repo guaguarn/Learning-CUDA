@@ -127,10 +127,11 @@ __global__ void flashAttentionkernel(const T *q, const T *k, const T *v, T *o,
 	T *o_ptr = o + o_offset;
 
 	float maxv = -INFINITY;
-	double sum = 0.0f; // 分母
+	float sum = 0.0f; // 分母
 	float scale = 1.0f / sqrtf(static_cast<float>(head_dim));
 
-	double a[256];
+	// 使用float以减少本地内存占用，精度对于attention足够
+	float a[256];
 	for (int d = 0; d < head_dim; d++)
 		a[d] = 0.0f;
 
@@ -154,15 +155,15 @@ __global__ void flashAttentionkernel(const T *q, const T *k, const T *v, T *o,
 		float oldmax = maxv;
 		if (s > maxv)
 			maxv = s;
-		double exp_factor = expf(oldmax - maxv); // 旧值衰减因子
-		double curr_exp = expf(s - maxv);		 // 当前值指数
+		float exp_factor = expf(oldmax - maxv); // 旧值衰减因子
+		float curr_exp = expf(s - maxv);		 // 当前值指数
 
 		sum = sum * exp_factor + curr_exp;
 
 		// 更新
 		for (int d = 0; d < head_dim; d++)
 		{
-			a[d] = a[d] * exp_factor + (double)v_ptr[d] * curr_exp;
+			a[d] = a[d] * exp_factor + static_cast<float>(v_ptr[d]) * curr_exp;
 		}
 	}
 	// 写入输出（归一化）
